@@ -1,24 +1,34 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Integer, String, DateTime, LargeBinary
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from datetime import datetime
+import base64
 
+
+class Base(DeclarativeBase):
+    pass
+
+
+db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
-# Utilisez SQLite pour la simplicité (à remplacer par une base de données plus robuste en production)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-CORS(app)  # Activer CORS pour permettre les requêtes depuis un frontend différent
+db.init_app(app)
 
+CORS(app)
 
 # Modèle de données pour les photos de camions
+
+
 class Photo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    marque = db.Column(db.String(100), nullable=False)
-    chassis = db.Column(db.String(100), nullable=False)
-    annee = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    marque: Mapped[str] = mapped_column(String(100), nullable=False)
+    chassis: Mapped[str] = mapped_column(String(100), nullable=False)
+    annee: Mapped[int] = mapped_column(Integer, nullable=False)
+    image: Mapped[LargeBinary] = mapped_column(LargeBinary, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow)
 
 
 # Route pour créer une nouvelle photo
@@ -28,7 +38,8 @@ def creer_photo():
     nouvelle_photo = Photo(
         marque=data['marque'],
         chassis=data['chassis'],
-        annee=data['annee']
+        annee=data['annee'],
+        image=base64.b64decode(data['image'].split(',')[1])
     )
     db.session.add(nouvelle_photo)
     db.session.commit()
@@ -40,7 +51,7 @@ def creer_photo():
 def obtenir_photos():
     photos = Photo.query.all()
     photos_json = [{'id': photo.id, 'marque': photo.marque, 'chassis': photo.chassis,
-                    'annee': photo.annee, 'timestamp': photo.timestamp} for photo in photos]
+                    'annee': photo.annee, 'timestamp': photo.timestamp, 'image': base64.b64encode(photo.image).decode('utf-8')} for photo in photos]
     return jsonify(photos_json), 200
 
 
