@@ -16,9 +16,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db.init_app(app)
 
-CORS(app)
 
-# Modèle de données pour les photos de camions
+CORS(app)
 
 
 class Photo(db.Model):
@@ -31,9 +30,15 @@ class Photo(db.Model):
         DateTime, default=datetime.utcnow)
 
 
-# Route pour créer une nouvelle photo
-@app.route('/photos', methods=['POST'])
-def creer_photo():
+class Category(db.Model):
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
+@app.route('/photo', methods=['POST'])
+def add_photo():
+    """Route to create a new photos"""
     data = request.get_json()
     nouvelle_photo = Photo(
         marque=data['marque'],
@@ -46,17 +51,41 @@ def creer_photo():
     return jsonify({'message': 'Nouvelle photo créée avec succès'}), 201
 
 
+@app.route('/category', methods=['POST'])
+def add_category():
+    """Route to create a new category"""
+    data = request.get_json()
+    new_category = Category(
+        name=data['name'],
+        description=data['description']
+    )
+    db.session.add(new_category)
+    db.session.commit()
+    return jsonify({'message': 'Nouvelle categorie créée avec succès'}), 201
+
+
+@app.route('/category', methods=['GET'])
+def get_categories():
+    """Route to get all categories"""
+    categories = Category.query.all()
+    categories_json = [{'id': category.id, 'name': category.name, 'description': category.description}
+                       for category in categories]
+    return jsonify(categories_json), 200
+
+
 # Route pour obtenir la liste des photos
-@app.route('/photos', methods=['GET'])
-def obtenir_photos():
+@app.route('/photo', methods=['GET'])
+def get_photos():
+    """Route to get all photos"""
     photos = Photo.query.all()
     photos_json = [{'id': photo.id, 'marque': photo.marque, 'chassis': photo.chassis,
                     'annee': photo.annee, 'timestamp': photo.timestamp, 'image': base64.b64encode(photo.image).decode('utf-8')} for photo in photos]
     return jsonify(photos_json), 200
 
 
-@app.route('/photos/search', methods=['GET'])
+@app.route('/photo/search', methods=['GET'])
 def search_photos():
+    """Route to get search photos"""
     queryString = request.args.get('q')
 
     # Créez une requête SQLAlchemy pour rechercher les photos en fonction des critères
